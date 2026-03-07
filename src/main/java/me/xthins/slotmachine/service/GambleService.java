@@ -133,8 +133,6 @@ public class GambleService {
 
         double winChance = plugin.getConfig().getDouble("bets." + tier.getPath() + ".win-chance", 0.29);
         boolean won = ThreadLocalRandom.current().nextDouble() < winChance;
-
-        // Near miss stays rare
         boolean nearMiss = !won && tier == BetTier.BIG && ThreadLocalRandom.current().nextDouble() < 0.08;
 
         if (!won) {
@@ -207,7 +205,7 @@ public class GambleService {
             player.getWorld().strikeLightningEffect(player.getLocation());
             player.playSound(player.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 1f, 1f);
             dataStore.addJackpotHistory(player.getName() + " - " + MoneyUtil.moneyCommas(outcome.getPayout()));
-            dataStore.setJackpot(plugin.getConfig().getDouble("settings.jackpot-reset-base", 10000000));
+            dataStore.setJackpot(plugin.getConfig().getDouble("settings.jackpot-reset-base", 1000000));
             return;
         }
 
@@ -340,6 +338,26 @@ public class GambleService {
     }
 
     public void stopCasinoSounds(Player player) {
+        try {
+            player.stopSound(Sound.UI_BUTTON_CLICK);
+        } catch (Throwable ignored) {
+        }
+        try {
+            player.stopSound(Sound.UI_TOAST_CHALLENGE_COMPLETE);
+        } catch (Throwable ignored) {
+        }
+        try {
+            player.stopSound(Sound.BLOCK_NOTE_BLOCK_BASS);
+        } catch (Throwable ignored) {
+        }
+        try {
+            player.stopSound(Sound.ENTITY_PLAYER_LEVELUP);
+        } catch (Throwable ignored) {
+        }
+        try {
+            player.stopSound(Sound.ENTITY_LIGHTNING_BOLT_THUNDER);
+        } catch (Throwable ignored) {
+        }
         try {
             player.stopAllSounds();
         } catch (Throwable ignored) {
