@@ -67,18 +67,18 @@ public class InventoryListener implements Listener {
 
         gambleService.stopCasinoSounds(player);
 
-        if (title.equals(spinningTitle) && gambleService.isSpinning(player.getUniqueId())) {
-            Bukkit.getScheduler().runTaskLater(plugin, () -> gambleService.forceClear(player.getUniqueId()), 20L);
+        if (title.equals(spinningTitle)) {
+            gambleService.forceClear(player.getUniqueId());
         }
     }
 
     private void handleMainMenuClick(Player player, int rawSlot) {
         switch (rawSlot) {
-            case 10 -> gambleMenu.openSlotsMenu(player);
-            case 12, 13, 14, 16 -> {
+            case 10, 11, 15, 16 -> {
                 player.sendMessage(ColorUtil.color("&cThat game is coming in phase 2."));
                 player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1f, 0.9f);
             }
+            case 13 -> gambleMenu.openSlotsMenu(player);
             default -> {
             }
         }
@@ -125,6 +125,7 @@ public class InventoryListener implements Listener {
 
     private void animate(Player player, SpinOutcome outcome, BetTier tier) {
         Inventory inv = player.getOpenInventory().getTopInventory();
+        String spinningTitle = ColorUtil.color(plugin.getConfig().getString("settings.spinning-title", "&d&lSpinning..."));
 
         int baseTicks = outcome.isJackpot()
                 ? plugin.getConfig().getInt("settings.spin-ticks-jackpot", 42)
@@ -148,6 +149,19 @@ public class InventoryListener implements Listener {
                 return;
             }
 
+            if (!gambleService.isSpinning(player.getUniqueId())) {
+                gambleService.stopCasinoSounds(player);
+                task.cancel();
+                return;
+            }
+
+            if (!player.getOpenInventory().getTitle().equals(spinningTitle)) {
+                gambleService.stopCasinoSounds(player);
+                gambleService.forceClear(player.getUniqueId());
+                task.cancel();
+                return;
+            }
+
             step[0]++;
 
             if (step[0] > rightStop) {
@@ -156,9 +170,9 @@ public class InventoryListener implements Listener {
                 return;
             }
 
-            spinColumn(inv, top[0], mid[0], bot[0], outcome, step[0] <= leftStop, 0, leftStop);
-            spinColumn(inv, top[1], mid[1], bot[1], outcome, step[0] <= middleStop, 1, middleStop);
-            spinColumn(inv, top[2], mid[2], bot[2], outcome, step[0] <= rightStop, 2, rightStop);
+            spinColumn(inv, top[0], mid[0], bot[0], outcome, step[0] <= leftStop, 0);
+            spinColumn(inv, top[1], mid[1], bot[1], outcome, step[0] <= middleStop, 1);
+            spinColumn(inv, top[2], mid[2], bot[2], outcome, step[0] <= rightStop, 2);
 
             float pitch = 1.25f;
             if (step[0] > leftStop) pitch = 1.05f;
@@ -170,12 +184,12 @@ public class InventoryListener implements Listener {
         }, 0L, 2L);
     }
 
-    private void spinColumn(Inventory inv, int topSlot, int midSlot, int botSlot, SpinOutcome outcome, boolean keepSpinning, int columnIndex, int stopAt) {
+    private void spinColumn(Inventory inv, int topSlot, int midSlot, int botSlot, SpinOutcome outcome, boolean keepSpinning, int columnIndex) {
         if (keepSpinning) {
             inv.setItem(topSlot, buildSymbolItem(randomAnyMat(), "&7"));
             inv.setItem(botSlot, buildSymbolItem(randomAnyMat(), "&7"));
 
-            if (outcome.isNearMiss() && columnIndex < 2 && stopAt - 2 <= 2_000_000) {
+            if (outcome.isNearMiss() && columnIndex < 2) {
                 inv.setItem(midSlot, buildSymbolItem(Material.EMERALD, "&a&lJackpot"));
             } else {
                 inv.setItem(midSlot, buildSymbolItem(randomAnyMat(), "&7"));
@@ -195,7 +209,7 @@ public class InventoryListener implements Listener {
             if (columnIndex < 2) {
                 inv.setItem(midSlot, buildSymbolItem(Material.EMERALD, "&a&lJackpot"));
             } else {
-                inv.setItem(midSlot, buildSymbolItem(randomNonMatchingMat(Material.EMERALD), "&7"));
+                inv.setItem(midSlot, buildSymbolItem(randomNonMatchingMat(Material.EMERALD), "&7Miss"));
             }
             inv.setItem(botSlot, buildSymbolItem(randomAnyMat(), "&7"));
             return;
@@ -217,6 +231,11 @@ public class InventoryListener implements Listener {
     }
 
     private void revealFinalOutcome(Player player, Inventory inv, int[] mid, BetTier tier, SpinOutcome outcome) {
+        if (!gambleService.isSpinning(player.getUniqueId())) {
+            gambleService.stopCasinoSounds(player);
+            return;
+        }
+
         if (outcome.isWon()) {
             ItemStack result = buildWinningItem(outcome);
             for (int slot : mid) {
@@ -241,6 +260,11 @@ public class InventoryListener implements Listener {
         }
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!gambleService.isSpinning(player.getUniqueId())) {
+                gambleService.stopCasinoSounds(player);
+                return;
+            }
+
             gambleService.applyOutcome(player, tier, outcome);
             gambleService.setSpinning(player, false);
             gambleService.stopCasinoSounds(player);
@@ -313,6 +337,12 @@ public class InventoryListener implements Listener {
         final int[] n = {0};
 
         Bukkit.getScheduler().runTaskTimer(plugin, task -> {
+            if (!gambleService.isSpinning(player.getUniqueId())) {
+                gambleService.stopCasinoSounds(player);
+                task.cancel();
+                return;
+            }
+
             n[0]++;
 
             for (int slot : slots) {
