@@ -164,7 +164,7 @@ public class InventoryListener implements Listener {
                 return;
             }
 
-            if (!player.getOpenInventory().getView().getTitle().equals(spinningTitle)) {
+            if (!player.getOpenInventory().getTitle().equals(spinningTitle)) {
                 hardCancelSpin(player);
                 return;
             }
