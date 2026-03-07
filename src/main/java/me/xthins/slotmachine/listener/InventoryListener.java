@@ -17,13 +17,22 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.scheduler.BukkitTask;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class InventoryListener implements Listener {
     private final SlotMachinePlugin plugin;
     private final GambleService gambleService;
     private final GambleMenu gambleMenu;
+
+    private final Map<UUID, BukkitTask> spinTasks = new HashMap<>();
+    private final Map<UUID, BukkitTask> finishTasks = new HashMap<>();
+    private final Map<UUID, BukkitTask> reopenTasks = new HashMap<>();
+    private final Map<UUID, BukkitTask> flashTasks = new HashMap<>();
 
     public InventoryListener(SlotMachinePlugin plugin, GambleService gambleService, GambleMenu gambleMenu) {
         this.plugin = plugin;
@@ -62,13 +71,13 @@ public class InventoryListener implements Listener {
     public void onClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player player)) return;
 
-        String spinningTitle = ColorUtil.color(plugin.getConfig().getString("settings.spinning-title", "&d&lSpinning..."));
         String title = event.getView().getTitle();
+        String spinningTitle = ColorUtil.color(plugin.getConfig().getString("settings.spinning-title", "&d&lSpinning..."));
 
         gambleService.stopCasinoSounds(player);
 
         if (title.equals(spinningTitle)) {
-            gambleService.forceClear(player.getUniqueId());
+            hardCancelSpin(player);
         }
     }
 
@@ -89,6 +98,7 @@ public class InventoryListener implements Listener {
 
         if (rawSlot == 18) {
             gambleService.stopCasinoSounds(player);
+            hardCancelSpin(player);
             gambleMenu.openMain(player);
             return;
         }
@@ -115,6 +125,7 @@ public class InventoryListener implements Listener {
             return;
         }
 
+        hardCancelSpin(player);
         gambleService.setSpinning(player, true);
         gambleService.stopCasinoSounds(player);
         gambleMenu.openSpinBase(player);
@@ -124,6 +135,7 @@ public class InventoryListener implements Listener {
     }
 
     private void animate(Player player, SpinOutcome outcome, BetTier tier) {
+        UUID uuid = player.getUniqueId();
         Inventory inv = player.getOpenInventory().getTopInventory();
         String spinningTitle = ColorUtil.color(plugin.getConfig().getString("settings.spinning-title", "&d&lSpinning..."));
 
@@ -141,32 +153,27 @@ public class InventoryListener implements Listener {
         final int middleStop = Math.max(leftStop + 2, baseTicks - 5);
         final int rightStop = baseTicks;
 
-        Bukkit.getScheduler().runTaskTimer(plugin, task -> {
+        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!player.isOnline()) {
-                gambleService.stopCasinoSounds(player);
-                gambleService.forceClear(player.getUniqueId());
-                task.cancel();
+                hardCancelSpin(player);
                 return;
             }
 
-            if (!gambleService.isSpinning(player.getUniqueId())) {
-                gambleService.stopCasinoSounds(player);
-                task.cancel();
+            if (!gambleService.isSpinning(uuid)) {
+                hardCancelSpin(player);
                 return;
             }
 
-            if (!player.getOpenInventory().getTitle().equals(spinningTitle)) {
-                gambleService.stopCasinoSounds(player);
-                gambleService.forceClear(player.getUniqueId());
-                task.cancel();
+            if (!player.getOpenInventory().getView().getTitle().equals(spinningTitle)) {
+                hardCancelSpin(player);
                 return;
             }
 
             step[0]++;
 
             if (step[0] > rightStop) {
+                cancelTask(spinTasks.remove(uuid));
                 revealFinalOutcome(player, inv, mid, tier, outcome);
-                task.cancel();
                 return;
             }
 
@@ -174,14 +181,16 @@ public class InventoryListener implements Listener {
             spinColumn(inv, top[1], mid[1], bot[1], outcome, step[0] <= middleStop, 1);
             spinColumn(inv, top[2], mid[2], bot[2], outcome, step[0] <= rightStop, 2);
 
-            float pitch = 1.25f;
-            if (step[0] > leftStop) pitch = 1.05f;
-            if (step[0] > middleStop) pitch = 0.9f;
-            if (step[0] > rightStop - 2) pitch = 0.75f;
-            if (outcome.isJackpot() && step[0] > rightStop - 3) pitch = 0.6f;
+            float pitch = 1.20f;
+            if (step[0] > leftStop) pitch = 1.0f;
+            if (step[0] > middleStop) pitch = 0.85f;
+            if (step[0] > rightStop - 2) pitch = 0.70f;
+            if (outcome.isJackpot() && step[0] > rightStop - 3) pitch = 0.58f;
 
-            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.9f, pitch);
+            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.6f, pitch);
         }, 0L, 2L);
+
+        spinTasks.put(uuid, task);
     }
 
     private void spinColumn(Inventory inv, int topSlot, int midSlot, int botSlot, SpinOutcome outcome, boolean keepSpinning, int columnIndex) {
@@ -231,8 +240,10 @@ public class InventoryListener implements Listener {
     }
 
     private void revealFinalOutcome(Player player, Inventory inv, int[] mid, BetTier tier, SpinOutcome outcome) {
-        if (!gambleService.isSpinning(player.getUniqueId())) {
-            gambleService.stopCasinoSounds(player);
+        UUID uuid = player.getUniqueId();
+
+        if (!gambleService.isSpinning(uuid)) {
+            hardCancelSpin(player);
             return;
         }
 
@@ -242,12 +253,44 @@ public class InventoryListener implements Listener {
                 inv.setItem(slot, result);
             }
 
-            flashPayline(player, inv, mid, result, () -> {
-                gambleService.applyOutcome(player, tier, outcome);
-                gambleService.setSpinning(player, false);
-                gambleService.stopCasinoSounds(player);
-                Bukkit.getScheduler().runTaskLater(plugin, () -> gambleMenu.openSlotsMenu(player), 20L);
-            });
+            BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+                int n = 0;
+
+                @Override
+                public void run() {
+                    if (!gambleService.isSpinning(uuid)) {
+                        cancelTask(flashTasks.remove(uuid));
+                        gambleService.stopCasinoSounds(player);
+                        return;
+                    }
+
+                    n++;
+
+                    for (int slot : mid) {
+                        inv.setItem(slot, n % 2 == 0 ? result : buildSymbolItem(Material.GLOWSTONE_DUST, "&e&lWIN"));
+                    }
+
+                    if (n >= 6) {
+                        for (int slot : mid) {
+                            inv.setItem(slot, result);
+                        }
+
+                        cancelTask(flashTasks.remove(uuid));
+                        gambleService.applyOutcome(player, tier, outcome);
+                        gambleService.setSpinning(player, false);
+                        gambleService.stopCasinoSounds(player);
+
+                        BukkitTask reopen = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                            if (player.isOnline()) {
+                                gambleMenu.openSlotsMenu(player);
+                            }
+                        }, 20L);
+                        reopenTasks.put(uuid, reopen);
+                    }
+                }
+            }, 0L, 4L);
+
+            flashTasks.put(uuid, task);
             return;
         }
 
@@ -255,21 +298,46 @@ public class InventoryListener implements Listener {
             inv.setItem(mid[0], buildSymbolItem(Material.EMERALD, "&a&lJackpot"));
             inv.setItem(mid[1], buildSymbolItem(Material.EMERALD, "&a&lJackpot"));
             inv.setItem(mid[2], buildSymbolItem(randomNonMatchingMat(Material.EMERALD), "&7Miss"));
-
-            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1f, 0.65f);
+            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.8f, 0.65f);
         }
 
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (!gambleService.isSpinning(player.getUniqueId())) {
-                gambleService.stopCasinoSounds(player);
+        BukkitTask finish = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!gambleService.isSpinning(uuid)) {
+                hardCancelSpin(player);
                 return;
             }
 
             gambleService.applyOutcome(player, tier, outcome);
             gambleService.setSpinning(player, false);
             gambleService.stopCasinoSounds(player);
-            Bukkit.getScheduler().runTaskLater(plugin, () -> gambleMenu.openSlotsMenu(player), 20L);
+
+            BukkitTask reopen = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (player.isOnline()) {
+                    gambleMenu.openSlotsMenu(player);
+                }
+            }, 20L);
+            reopenTasks.put(uuid, reopen);
         }, 12L);
+
+        finishTasks.put(uuid, finish);
+    }
+
+    private void hardCancelSpin(Player player) {
+        UUID uuid = player.getUniqueId();
+
+        cancelTask(spinTasks.remove(uuid));
+        cancelTask(flashTasks.remove(uuid));
+        cancelTask(finishTasks.remove(uuid));
+        cancelTask(reopenTasks.remove(uuid));
+
+        gambleService.forceClear(uuid);
+        gambleService.stopCasinoSounds(player);
+    }
+
+    private void cancelTask(BukkitTask task) {
+        if (task != null) {
+            task.cancel();
+        }
     }
 
     private Material randomAnyMat() {
@@ -331,31 +399,5 @@ public class InventoryListener implements Listener {
             item.setItemMeta(meta);
         }
         return item;
-    }
-
-    private void flashPayline(Player player, Inventory inv, int[] slots, ItemStack result, Runnable done) {
-        final int[] n = {0};
-
-        Bukkit.getScheduler().runTaskTimer(plugin, task -> {
-            if (!gambleService.isSpinning(player.getUniqueId())) {
-                gambleService.stopCasinoSounds(player);
-                task.cancel();
-                return;
-            }
-
-            n[0]++;
-
-            for (int slot : slots) {
-                inv.setItem(slot, n[0] % 2 == 0 ? result : buildSymbolItem(Material.GLOWSTONE_DUST, "&e&lWIN"));
-            }
-
-            if (n[0] >= 6) {
-                for (int slot : slots) {
-                    inv.setItem(slot, result);
-                }
-                task.cancel();
-                done.run();
-            }
-        }, 0L, 4L);
     }
 }
