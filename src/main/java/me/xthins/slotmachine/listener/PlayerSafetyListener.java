@@ -1,6 +1,7 @@
 package me.xthins.slotmachine.listener;
 
 import me.xthins.slotmachine.service.GambleService;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -14,6 +15,8 @@ public class PlayerSafetyListener implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        gambleService.forceClear(event.getPlayer().getUniqueId());
+        Player player = event.getPlayer();
+        gambleService.stopCasinoSounds(player);
+        gambleService.forceClear(player.getUniqueId());
     }
 }
