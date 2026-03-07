@@ -107,28 +107,52 @@ public class InventoryListener implements Listener {
             step[0]++;
 
             if (step[0] > ticks) {
-                ItemStack result = new ItemStack(outcome.getSymbol().getMaterial());
-                for (int slot : mid) {
-                    inv.setItem(slot, result);
-                }
+                if (outcome.isWon()) {
+                    ItemStack result = new ItemStack(outcome.getSymbol().getMaterial());
+                    for (int slot : mid) {
+                        inv.setItem(slot, result);
+                    }
 
-                flashPayline(player, inv, mid, result, () -> {
-                    gambleService.applyOutcome(player, tier, outcome);
-                    gambleService.setSpinning(player, false);
-                    Bukkit.getScheduler().runTaskLater(plugin, () -> gambleMenu.openMain(player), 20L);
-                });
+                    flashPayline(player, inv, mid, result, () -> {
+                        gambleService.applyOutcome(player, tier, outcome);
+                        gambleService.setSpinning(player, false);
+                        Bukkit.getScheduler().runTaskLater(plugin, () -> gambleMenu.openMain(player), 20L);
+                    });
+                } else if (outcome.isNearMiss()) {
+                    inv.setItem(mid[0], new ItemStack(Material.EMERALD));
+                    inv.setItem(mid[1], new ItemStack(Material.EMERALD));
+                    inv.setItem(mid[2], new ItemStack(randomNonMatchingMat(Material.EMERALD)));
+
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        gambleService.applyOutcome(player, tier, outcome);
+                        gambleService.setSpinning(player, false);
+                        Bukkit.getScheduler().runTaskLater(plugin, () -> gambleMenu.openMain(player), 20L);
+                    }, 12L);
+                } else {
+                    Material first = randomAnyMat();
+                    Material second = randomNonMatchingMat(first);
+                    Material third = randomNonMatchingMat(first, second);
+
+                    inv.setItem(mid[0], new ItemStack(first));
+                    inv.setItem(mid[1], new ItemStack(second));
+                    inv.setItem(mid[2], new ItemStack(third));
+
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        gambleService.applyOutcome(player, tier, outcome);
+                        gambleService.setSpinning(player, false);
+                        Bukkit.getScheduler().runTaskLater(plugin, () -> gambleMenu.openMain(player), 20L);
+                    }, 12L);
+                }
 
                 task.cancel();
                 return;
             }
 
-            // Top and bottom rows can stay random
             for (int i = 0; i < 3; i++) {
                 inv.setItem(top[i], new ItemStack(randomAnyMat()));
                 inv.setItem(bot[i], new ItemStack(randomAnyMat()));
             }
 
-            // Middle row should NEVER accidentally show a fake winning line during animation
             if (outcome.isNearMiss() && step[0] > ticks - 4) {
                 inv.setItem(mid[0], new ItemStack(Material.EMERALD));
                 inv.setItem(mid[1], new ItemStack(Material.EMERALD));
