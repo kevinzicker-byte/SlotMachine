@@ -3,7 +3,7 @@ version: 1.0.0
 main: me.xthins.slotmachine.SlotMachinePlugin
 api-version: "1.21"
 author: xThins
-depend: [Vault]
+depend: [Vault, NBTAPI]
 softdepend: [DecentHolograms, SaberFactions, Factions]
 commands:
   gamble:
