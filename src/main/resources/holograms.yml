@@ -1,0 +1,36 @@
+enabled: true
+update-interval-seconds: 30
+
+winners:
+  enabled: true
+  name: "slot_winners"
+  world: "world"
+  x: 0.5
+  y: 70.0
+  z: 0.5
+  max-lines: 10
+  title: "&d&lTop Winners"
+  entry: "&f#{rank} &d{player} &7- &a{amount}"
+
+factions:
+  enabled: true
+  name: "slot_factions"
+  world: "world"
+  x: 3.5
+  y: 70.0
+  z: 0.5
+  max-lines: 10
+  title: "&6&lTop Gambling Factions"
+  entry: "&f#{rank} &e{faction} &7- &a{amount}"
+
+jackpot:
+  enabled: true
+  name: "slot_jackpot"
+  world: "world"
+  x: -3.5
+  y: 70.0
+  z: 0.5
+  title: "&5&lCurrent Jackpot"
+  value: "&d{jackpot}"
+  happy-on: "&7Happy Hour: &aACTIVE"
+  happy-off: "&7Happy Hour: &cOFF"

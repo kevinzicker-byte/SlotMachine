@@ -1,0 +1,49 @@
+settings:
+  gui-title: "&d&lSLOT MACHINE &8- &7Pick a drink"
+  spinning-title: "&d&lSPINNING..."
+  jackpot-starting-pot: 10000000
+  jackpot-reset-base: 10000000
+  jackpot-chance: 0.0025
+  pot-contribution-percent: 25
+  spin-ticks-normal: 24
+  spin-ticks-jackpot: 34
+  auto-save-seconds: 60
+  bedrock-safe-timeout-seconds: 15
+  announce-milestones: true
+  milestone-values:
+    - 20000000
+    - 50000000
+    - 100000000
+
+bets:
+  small:
+    amount: 250000
+    display-name: "&a&lStreet Sip"
+    material: "SLIME_BALL"
+    slot: 11
+    min-multiplier: 1.40
+    max-multiplier: 2.20
+    win-chance: 0.42
+  medium:
+    amount: 1000000
+    display-name: "&6&lVintage Toss"
+    material: "GOLD_INGOT"
+    slot: 13
+    min-multiplier: 2.00
+    max-multiplier: 7.00
+    win-chance: 0.27
+  big:
+    amount: 10000000
+    display-name: "&c&lHigh Roller Reserve"
+    material: "DIAMOND"
+    slot: 15
+    min-multiplier: 5.00
+    max-multiplier: 25.00
+    win-chance: 0.12
+
+happy-hour:
+  enabled: true
+  multiplier: 2.0
+  duration-minutes: 5
+  interval-minutes: 60
+  double-jackpot-chance: true

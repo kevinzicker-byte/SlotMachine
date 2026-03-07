@@ -1,0 +1,21 @@
+name: SlotMachine
+version: 1.0.0
+main: me.xthins.slotmachine.SlotMachinePlugin
+api-version: "1.21"
+author: xThins
+depend: [Vault]
+softdepend: [DecentHolograms, SaberFactions, Factions]
+commands:
+  gamble:
+    description: Open the slot machine
+  happyhour:
+    description: Manage happy hour
+  gamblefix:
+    description: Clears stuck spin state
+  slotmachine:
+    description: SlotMachine admin / holograms
+permissions:
+  slotmachine.use:
+    default: true
+  slotmachine.admin:
+    default: op
