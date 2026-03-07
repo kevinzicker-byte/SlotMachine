@@ -8,7 +8,6 @@ import me.xthins.slotmachine.service.GambleService;
 import me.xthins.slotmachine.util.ColorUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -83,10 +82,7 @@ public class InventoryListener implements Listener {
 
     private void handleMainMenuClick(Player player, int rawSlot) {
         switch (rawSlot) {
-            case 10, 11, 15, 16 -> {
-                player.sendMessage(ColorUtil.color("&cThat game is coming in phase 2."));
-                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1f, 0.9f);
-            }
+            case 10, 11, 15, 16 -> player.sendMessage(ColorUtil.color("&cThat game is coming in phase 2."));
             case 13 -> gambleMenu.openSlotsMenu(player);
             default -> {
             }
@@ -180,14 +176,6 @@ public class InventoryListener implements Listener {
             spinColumn(inv, top[0], mid[0], bot[0], outcome, step[0] <= leftStop, 0);
             spinColumn(inv, top[1], mid[1], bot[1], outcome, step[0] <= middleStop, 1);
             spinColumn(inv, top[2], mid[2], bot[2], outcome, step[0] <= rightStop, 2);
-
-            float pitch = 1.20f;
-            if (step[0] > leftStop) pitch = 1.0f;
-            if (step[0] > middleStop) pitch = 0.85f;
-            if (step[0] > rightStop - 2) pitch = 0.70f;
-            if (outcome.isJackpot() && step[0] > rightStop - 3) pitch = 0.58f;
-
-            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.6f, pitch);
         }, 0L, 2L);
 
         spinTasks.put(uuid, task);
@@ -298,7 +286,6 @@ public class InventoryListener implements Listener {
             inv.setItem(mid[0], buildSymbolItem(Material.EMERALD, "&a&lJackpot"));
             inv.setItem(mid[1], buildSymbolItem(Material.EMERALD, "&a&lJackpot"));
             inv.setItem(mid[2], buildSymbolItem(randomNonMatchingMat(Material.EMERALD), "&7Miss"));
-            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.8f, 0.65f);
         }
 
         BukkitTask finish = Bukkit.getScheduler().runTaskLater(plugin, () -> {
